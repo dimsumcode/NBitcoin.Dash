@@ -1,12 +1,32 @@
 ﻿using NBitcoin.DataEncoders;
 using System;
 using NUnit.Framework;
+using System.Threading;
+using NBitcoin.Protocol;
 
 namespace NBitcoin.Dash.Tests
 {
     [TestFixture]
     public class UnitTest1
     {
+        [Test]
+        public void X11PoWTest()
+        {
+            {
+                NBitcoin.Dash.Networks.Register();
+                CancellationTokenSource cts = new CancellationTokenSource();
+                var client = Node.Connect(NBitcoin.Dash.Networks.Testnet, "127.0.0.1:19999", new NodeConnectionParameters()
+                {
+                    Version = (ProtocolVersion)70208,
+                    ConnectCancellation = cts.Token
+                });
+
+                Assert.True(client.IsConnected);
+
+                var chain = client.GetChain();
+            }
+        }
+
         [Test]
         public void Test1()
         {

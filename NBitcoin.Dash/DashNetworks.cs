@@ -4,6 +4,7 @@ using NBitcoin.Protocol;
 using System;
 using System.Net;
 using System.Collections.Generic;
+using HashLib;
 
 namespace NBitcoin.Dash
 {
@@ -54,6 +55,7 @@ namespace NBitcoin.Dash
                 MinerConfirmationWindow = 2016, // nPowTargetTimespan / nPowTargetSpacing
                 CoinbaseMaturity = 100,
 				HashGenesisBlock = new uint256("0x00000ffd590b1485b3caadc19b22e6379c733355108f107a430458cdf3407ab6"),
+                GetPoWHash = GetPoWHash,
 				LitecoinWorkCalculation = true
 			})
 			.SetBase58Bytes(Base58Type.PUBKEY_ADDRESS, new byte[] { 76 })
@@ -63,7 +65,14 @@ namespace NBitcoin.Dash
 			.SetBase58Bytes(Base58Type.EXT_SECRET_KEY, new byte[] { 0x04, 0x88, 0xAD, 0xE4 })
 			.SetBech32(Bech32Type.WITNESS_PUBKEY_ADDRESS, Encoders.Bech32("dash"))
 			.SetBech32(Bech32Type.WITNESS_SCRIPT_ADDRESS, Encoders.Bech32("dash"))
-			//.SetMagic(0xdbb6c0fb)
+
+            //https://github.com/dashpay/dash/blob/master/src/chainparams.cpp
+            //pchMessageStart[0] = 0xbf;
+            //pchMessageStart[1] = 0x0c;
+            //pchMessageStart[2] = 0x6b;
+            //pchMessageStart[3] = 0xbd;
+            .SetMagic(0xbd6b0cbf)
+
 			.SetPort(port)
 			.SetRPCPort(9998)
 			.SetName("dash-main")
@@ -80,7 +89,7 @@ namespace NBitcoin.Dash
             .BuildAndRegister();
 
             builder = new NetworkBuilder();
-			port = 19994;
+			port = 19999;
 			_Testnet = builder.SetConsensus(new Consensus()
 			{
 				SubsidyHalvingInterval = 210240,
@@ -96,18 +105,25 @@ namespace NBitcoin.Dash
 				MinerConfirmationWindow = 2016, // nPowTargetTimespan / nPowTargetSpacing
 				CoinbaseMaturity = 100,
 				HashGenesisBlock = new uint256("0x00000bafbc94add76cb75e2ec92894837288a481e5c005f6563d91623bf8bc2c"),
-				LitecoinWorkCalculation = true
+                GetPoWHash = GetPoWHash,
+                LitecoinWorkCalculation = true
 			})
 			.SetBase58Bytes(Base58Type.PUBKEY_ADDRESS, new byte[] { 140 })
 			.SetBase58Bytes(Base58Type.SCRIPT_ADDRESS, new byte[] { 19 })
 			.SetBase58Bytes(Base58Type.SECRET_KEY, new byte[] { 239 })
 			.SetBase58Bytes(Base58Type.EXT_PUBLIC_KEY, new byte[] { 0x04, 0x35, 0x87, 0xCF })
 			.SetBase58Bytes(Base58Type.EXT_SECRET_KEY, new byte[] { 0x04, 0x35, 0x83, 0x94 })
-
             .SetBech32(Bech32Type.WITNESS_PUBKEY_ADDRESS, Encoders.Bech32("tdash"))
 			.SetBech32(Bech32Type.WITNESS_SCRIPT_ADDRESS, Encoders.Bech32("tdash"))
-			//.SetMagic(0xf1c8d2fd)
-			.SetPort(port)
+
+            // https://github.com/dashpay/dash/blob/master/src/chainparams.cpp
+            //pchMessageStart[0] = 0xce;
+            //pchMessageStart[1] = 0xe2;
+            //pchMessageStart[2] = 0xca;
+            //pchMessageStart[3] = 0xff;
+            .SetMagic(0xffcae2ce)
+
+            .SetPort(port)
 			.SetRPCPort(19998)
 			.SetName("dash-test")
 			.AddAlias("dash-testnet")
@@ -123,9 +139,29 @@ namespace NBitcoin.Dash
 
         static uint256 GetPoWHash(BlockHeader header)
 		{
-			var headerBytes = header.ToBytes();
-			var h = NBitcoin.Crypto.SCrypt.ComputeDerivedKey(headerBytes, headerBytes, 1024, 1, 1, null, 32);
-			return new uint256(h);
+            // X11
+            List<IHash> _hashers = new List<IHash>
+            {
+                HashFactory.Crypto.SHA3.CreateBlake512(),
+                HashFactory.Crypto.SHA3.CreateBlueMidnightWish512(),
+                HashFactory.Crypto.SHA3.CreateGroestl512(),
+                HashFactory.Crypto.SHA3.CreateSkein512(),
+                HashFactory.Crypto.SHA3.CreateJH512(),
+                HashFactory.Crypto.SHA3.CreateKeccak512(),
+                HashFactory.Crypto.SHA3.CreateLuffa512(),
+                HashFactory.Crypto.SHA3.CreateCubeHash512(),
+                HashFactory.Crypto.SHA3.CreateSHAvite3_512(),
+                HashFactory.Crypto.SHA3.CreateSIMD512(),
+                HashFactory.Crypto.SHA3.CreateEcho512(),
+            };
+
+            var buffer = header.ToBytes();
+            foreach (var hasher in _hashers)
+            {
+                buffer = hasher.ComputeBytes(buffer).GetBytes();
+            }
+            
+			return new uint256(buffer);
 		}
 
 		private static IEnumerable<NetworkAddress> ToSeed(Tuple<byte[], int>[] tuples)
